@@ -6,6 +6,15 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-17
+
+### Fixed
+
+- Prevented blue document links and grayscale list regions from being mistaken
+  for the filled confirmation button during post-submission verification.
+- Kept the fail-closed one-attempt boundary while correctly recognizing the
+  saved document state after the join button reappears.
+
 ## [1.0.0] - 2026-07-17
 
 ### Added

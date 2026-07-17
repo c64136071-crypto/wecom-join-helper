@@ -46,6 +46,40 @@ class TemplateStoreTests(unittest.TestCase):
             [call((1610, 2045), bounds), call((3720, 1044), bounds)],
         )
 
+    def test_card_is_submitted_ignores_unfilled_submit_false_positive(self):
+        ui = WeComUI(Config(dry_run=False))
+        screenshot = Image.new("RGB", (400, 220), "#f1f1f1")
+        join_match = TemplateMatch(80, 190, 1.0, 1.0, 88, 39)
+        false_submit_match = TemplateMatch(300, 190, 0.895, 1.5, 132, 58)
+        ui._document_window = Mock()
+        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 400, 220)))
+        ui._matches = Mock(
+            side_effect=lambda _image, name: {
+                "join": [join_match],
+                "submit": [false_submit_match],
+            }[name]
+        )
+
+        self.assertTrue(ui.card_is_submitted())
+
+    def test_card_is_submitted_rejects_visible_filled_submit_button(self):
+        ui = WeComUI(Config(dry_run=False))
+        screenshot = Image.new("RGB", (400, 220), "#f1f1f1")
+        submit_match = TemplateMatch(300, 190, 1.0, 1.0, 88, 39)
+        draw = ImageDraw.Draw(screenshot)
+        draw.rectangle((256, 171, 343, 209), fill="#2f7fe5")
+        join_match = TemplateMatch(80, 190, 1.0, 1.0, 88, 39)
+        ui._document_window = Mock()
+        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 400, 220)))
+        ui._matches = Mock(
+            side_effect=lambda _image, name: {
+                "join": [join_match],
+                "submit": [submit_match],
+            }[name]
+        )
+
+        self.assertFalse(ui.card_is_submitted())
+
     def test_pair_card_matches_returns_lowest_valid_card_first(self):
         icons = [
             TemplateMatch(820, 300, 0.99, 1.0, 40, 40),

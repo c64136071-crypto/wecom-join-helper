@@ -90,6 +90,28 @@ def safe_commit_point(bounds: tuple[int, int, int, int]) -> tuple[int, int]:
     return width - 120, height // 2
 
 
+def match_has_filled_blue_background(
+    screenshot: Any,
+    match: TemplateMatch,
+    *,
+    minimum_ratio: float = 0.2,
+) -> bool:
+    left = max(0, match.x - match.width // 2)
+    top = max(0, match.y - match.height // 2)
+    right = min(screenshot.width, left + match.width)
+    bottom = min(screenshot.height, top + match.height)
+    crop = screenshot.crop((left, top, right, bottom)).convert("RGB")
+    pixels = list(crop.getdata())
+    if not pixels:
+        return False
+    blue_pixels = sum(
+        1
+        for red, green, blue in pixels
+        if blue >= 130 and blue - red >= 35 and blue - green >= 20
+    )
+    return blue_pixels / len(pixels) >= minimum_ratio
+
+
 class WeComUI:
     def __init__(self, config: Config, logger: logging.Logger | None = None):
         self.config = config
@@ -296,9 +318,20 @@ class WeComUI:
         try:
             window = self._document_window()
             screenshot, _ = self._screenshot(window, focus_window=False)
-            return self._match(screenshot, "join") is not None and self._match(
-                screenshot, "submit"
-            ) is None
+            join_matches = self._matches(screenshot, "join")
+            submit_candidates = self._matches(screenshot, "submit")
+            filled_submit_matches = [
+                match
+                for match in submit_candidates
+                if match_has_filled_blue_background(screenshot, match)
+            ]
+            self.logger.debug(
+                "submission verification; join=%d submit_candidates=%d filled_submit=%d",
+                len(join_matches),
+                len(submit_candidates),
+                len(filled_submit_matches),
+            )
+            return bool(join_matches) and not filled_submit_matches
         except UIError:
             return False
 

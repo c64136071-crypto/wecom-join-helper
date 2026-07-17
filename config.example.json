@@ -1,0 +1,19 @@
+{
+  "title_keyword": "下午茶",
+  "window_title_keyword": "企业微信|WeCom",
+  "document_window_title_keyword": "企业微信-文档",
+  "run_weekdays": [],
+  "normal_interval_seconds": 0.5,
+  "rush_interval_seconds": 0.5,
+  "rush_start": "11:00",
+  "rush_end": "12:00",
+  "match_threshold": 0.88,
+  "action_timeout_seconds": 8.0,
+  "dry_run": true,
+  "setup_complete": false,
+  "recognition_test_passed": false,
+  "stop_after_submission": true,
+  "templates_dir": "templates",
+  "state_path": "state.json",
+  "log_path": "wecom-rusher.log"
+}

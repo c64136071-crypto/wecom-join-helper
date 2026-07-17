@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+
+# Build and release output
+build/
+dist/
+Output/
+release/
+*.egg-info/
+
+# Runtime and personal data
+config.json
+state.json
+*.log
+data/
+outputs/
+work/
+templates/calibration-screen.png
+templates/current-document.png
+templates/detail-preview.png
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Internal implementation notes
+docs/superpowers/

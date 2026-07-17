@@ -324,11 +324,8 @@ class WeComRusherApp:
             self.detail_var.set("识别测试通过，可以启用正式模式")
             self._configure_setup_controls()
         elif status == "submitted":
-            self.detail_var.set("程序已停止，不会重复提交")
+            self.detail_var.set("本轮已停止；新接龙出现后可再次开始")
             self.stop_button.configure(state="disabled")
-            if not self.close_scheduled:
-                self.close_scheduled = True
-                self.root.after(3000, self._close)
         elif status in {
             "timeout",
             "unsafe_state",

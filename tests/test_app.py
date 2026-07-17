@@ -3,9 +3,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from wecom_rusher.app import (
+    WeComRusherApp,
     application_root,
     config_for_worker,
     load_application_config,
@@ -17,6 +18,23 @@ from wecom_rusher.app import (
 
 
 class AppTests(unittest.TestCase):
+    def test_submitted_status_keeps_window_open_for_another_manual_run(self):
+        app = WeComRusherApp.__new__(WeComRusherApp)
+        app.status_var = Mock()
+        app.time_var = Mock()
+        app.detail_var = Mock()
+        app.stop_button = Mock()
+        app.root = Mock()
+        app.close_scheduled = False
+
+        app._apply_status("submitted")
+
+        self.assertFalse(app.close_scheduled)
+        app.root.after.assert_not_called()
+        app.detail_var.set.assert_called_once_with(
+            "本轮已停止；新接龙出现后可再次开始"
+        )
+
     def test_application_root_uses_executable_when_frozen(self):
         with (
             patch.object(sys, "frozen", True, create=True),

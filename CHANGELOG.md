@@ -6,6 +6,15 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-17
+
+### Changed
+
+- Kept the desktop window open after a successful join so the user can start a
+  later monitoring run manually.
+- Preserved per-card deduplication and the one-attempt boundary within each
+  monitoring run.
+
 ## [1.0.1] - 2026-07-17
 
 ### Fixed

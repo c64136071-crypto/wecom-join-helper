@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 from PIL import Image, ImageDraw
 
@@ -20,6 +20,22 @@ class TemplateStoreTests(unittest.TestCase):
             TemplateStore.required_names(),
             ("yellow_icon", "participate", "join", "submit"),
         )
+
+    def test_matching_windows_excludes_non_wecom_processes_with_matching_titles(self):
+        ui = WeComUI(Config())
+        wecom_window = Mock()
+        edge_window = Mock()
+        mail_window = Mock()
+        desktop = Mock()
+        desktop.windows.return_value = [wecom_window, edge_window, mail_window]
+        ui._window_executable_name = Mock(
+            side_effect=["WXWork.exe", "msedge.exe", "WeMail.exe"]
+        )
+
+        with patch("pywinauto.Desktop", return_value=desktop):
+            matches = ui._matching_windows()
+
+        self.assertEqual(matches, [wecom_window])
 
     def test_safe_commit_point_is_outside_the_document_list(self):
         self.assertEqual(safe_commit_point((0, 0, 3840, 2088)), (3720, 1044))

@@ -113,12 +113,49 @@ def match_has_filled_blue_background(
 
 
 class WeComUI:
+    _allowed_executable_names = {"wxwork.exe", "wxworkweb.exe"}
+
     def __init__(self, config: Config, logger: logging.Logger | None = None):
         self.config = config
         self.logger = logger or logging.getLogger(__name__)
         self.templates = TemplateStore(config.templates_dir)
         self.ocr = OCRReader()
         self._group_signature: bytes | None = None
+
+    @staticmethod
+    def _window_executable_name(window: Any) -> str:
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.QueryFullProcessImageNameW.argtypes = [
+                wintypes.HANDLE,
+                wintypes.DWORD,
+                wintypes.LPWSTR,
+                ctypes.POINTER(wintypes.DWORD),
+            ]
+            kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            process_id = int(window.element_info.process_id)
+            handle = kernel32.OpenProcess(0x1000, False, process_id)
+            if not handle:
+                return ""
+            try:
+                size = wintypes.DWORD(32768)
+                buffer = ctypes.create_unicode_buffer(size.value)
+                if not kernel32.QueryFullProcessImageNameW(
+                    handle, 0, buffer, ctypes.byref(size)
+                ):
+                    return ""
+                return Path(buffer.value).name
+            finally:
+                kernel32.CloseHandle(handle)
+        except (AttributeError, OSError, TypeError, ValueError):
+            return ""
 
     def _matching_windows(self) -> list[Any]:
         try:
@@ -128,9 +165,21 @@ class WeComUI:
 
         try:
             pattern = f".*(?:{self.config.window_title_keyword}).*"
-            windows = Desktop(backend="uia").windows(title_re=pattern, visible_only=True)
+            candidates = Desktop(backend="uia").windows(
+                title_re=pattern, visible_only=True
+            )
         except Exception as exc:
             raise UIError(f"could not inspect Enterprise WeChat window: {exc}") from exc
+        windows = []
+        for window in candidates:
+            executable_name = self._window_executable_name(window).casefold()
+            if executable_name in self._allowed_executable_names:
+                windows.append(window)
+            else:
+                self.logger.debug(
+                    "ignored title-matching non-WeCom window; executable=%s",
+                    executable_name or "<unknown>",
+                )
         return windows
 
     def _select_window(self, windows: list[Any], label: str) -> Any:

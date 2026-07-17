@@ -1,6 +1,6 @@
 # Release Checklist
 
-## v1.0.2 Evidence
+## v1.0.3 Evidence
 
 - Public tree excludes runtime config, state, logs, caches, and real screenshots.
 - Four published templates were manually inspected and contain no personal or
@@ -23,11 +23,11 @@
 
 | Evidence | Result |
 | --- | --- |
-| Automated tests | 75 passed |
+| Automated tests | 76 passed |
 | Authorized live check | One insertion, one terminal success, no retry |
 | Verified environment | Windows build 26200, WeCom 5.0.9.6060 |
-| Portable v1.0.2 ZIP | 96.80 MB, SHA-256 verified |
-| Installer v1.0.2 | 68.88 MB, SHA-256 verified |
+| Portable v1.0.3 ZIP | 96.80 MB, SHA-256 verified |
+| Installer v1.0.3 | 68.88 MB, SHA-256 verified |
 | Installer lifecycle | Install, frozen smoke, uninstall passed |
 
 The final artifacts were rebuilt from the reviewed release tree. Their checksum

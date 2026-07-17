@@ -6,6 +6,14 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-07-17
+
+### Fixed
+
+- Restricted window discovery to the real `WXWork.exe` and `WXWorkWeb.exe`
+  processes so browser tabs and WeCom Mail windows cannot steal focus merely
+  because their titles contain `WeCom`.
+
 ## [1.0.2] - 2026-07-17
 
 ### Changed

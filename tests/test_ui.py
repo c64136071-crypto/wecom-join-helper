@@ -37,6 +37,35 @@ class TemplateStoreTests(unittest.TestCase):
 
         self.assertEqual(matches, [wecom_window])
 
+    def test_document_window_accepts_wemail_document_host(self):
+        ui = WeComUI(Config())
+        mail_document = Mock()
+        mail_document.window_text.return_value = "企业微信-文档"
+        edge_document = Mock()
+        edge_document.window_text.return_value = "企业微信-文档"
+        desktop = Mock()
+        desktop.windows.return_value = [mail_document, edge_document]
+        ui._window_executable_name = Mock(
+            side_effect=["WeMail.exe", "msedge.exe"]
+        )
+
+        with patch("pywinauto.Desktop", return_value=desktop):
+            document = ui._document_window()
+
+        self.assertIs(document, mail_document)
+
+    def test_document_window_rejects_non_exact_wemail_title(self):
+        ui = WeComUI(Config())
+        mail_window = Mock()
+        mail_window.window_text.return_value = "Inbox - 企业微信-文档"
+        desktop = Mock()
+        desktop.windows.return_value = [mail_window]
+        ui._window_executable_name = Mock(return_value="WeMail.exe")
+
+        with patch("pywinauto.Desktop", return_value=desktop):
+            with self.assertRaises(UIError):
+                ui._document_window()
+
     def test_safe_commit_point_is_outside_the_document_list(self):
         self.assertEqual(safe_commit_point((0, 0, 3840, 2088)), (3720, 1044))
 

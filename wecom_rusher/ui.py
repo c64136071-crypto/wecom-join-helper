@@ -114,6 +114,7 @@ def match_has_filled_blue_background(
 
 class WeComUI:
     _allowed_executable_names = {"wxwork.exe", "wxworkweb.exe"}
+    _document_executable_names = _allowed_executable_names | {"wemail.exe"}
 
     def __init__(self, config: Config, logger: logging.Logger | None = None):
         self.config = config
@@ -157,7 +158,11 @@ class WeComUI:
         except (AttributeError, OSError, TypeError, ValueError):
             return ""
 
-    def _matching_windows(self) -> list[Any]:
+    def _matching_windows(
+        self,
+        allowed_executable_names: set[str] | None = None,
+        exact_titles: dict[str, str] | None = None,
+    ) -> list[Any]:
         try:
             from pywinauto import Desktop
         except ImportError:
@@ -170,10 +175,23 @@ class WeComUI:
             )
         except Exception as exc:
             raise UIError(f"could not inspect Enterprise WeChat window: {exc}") from exc
+        allowed_names = (
+            self._allowed_executable_names
+            if allowed_executable_names is None
+            else allowed_executable_names
+        )
+        required_titles = exact_titles or {}
         windows = []
         for window in candidates:
             executable_name = self._window_executable_name(window).casefold()
-            if executable_name in self._allowed_executable_names:
+            if executable_name in allowed_names:
+                required_title = required_titles.get(executable_name)
+                if required_title is not None and window.window_text() != required_title:
+                    self.logger.debug(
+                        "ignored non-document WeCom host; executable=%s",
+                        executable_name,
+                    )
+                    continue
                 windows.append(window)
             else:
                 self.logger.debug(
@@ -207,7 +225,12 @@ class WeComUI:
     def _document_window(self) -> Any:
         windows = [
             window
-            for window in self._matching_windows()
+            for window in self._matching_windows(
+                self._document_executable_names,
+                exact_titles={
+                    "wemail.exe": self.config.document_window_title_keyword,
+                },
+            )
             if self.config.document_window_title_keyword in window.window_text()
         ]
         return self._select_window(windows, "Enterprise WeChat document")

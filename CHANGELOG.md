@@ -6,6 +6,14 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-07-21
+
+### Fixed
+
+- Allowed `WeMail.exe` only for strictly titled WeCom document windows, fixing
+  join documents that stopped being recognized after the process allowlist was
+  introduced while keeping browser and mail windows out of chat discovery.
+
 ## [1.0.3] - 2026-07-17
 
 ### Fixed

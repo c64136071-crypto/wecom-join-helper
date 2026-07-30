@@ -33,7 +33,8 @@ class RepositoryHygieneTests(unittest.TestCase):
 
     def test_example_config_is_safe_by_default(self):
         payload = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
-        self.assertTrue(payload["dry_run"])
+        self.assertFalse(payload["dry_run"])
+        self.assertTrue(payload["setup_complete"])
         self.assertTrue(payload["stop_after_submission"])
         self.assertEqual(payload["run_weekdays"], [])
 

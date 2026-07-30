@@ -15,6 +15,8 @@ from .ui import CardCandidate, UIError, WeComUI
 
 
 class UIAdapter(Protocol):
+    def prepare_monitoring(self) -> None: ...
+
     def find_target_card(self, keyword: str) -> CardCandidate | None: ...
 
     def open_card(self, candidate: CardCandidate) -> None: ...
@@ -56,13 +58,17 @@ class Rusher:
             config.rush_end,
         )
 
-    def scan_once(self) -> str:
+    def scan_once(self, stop_event: threading.Event | None = None) -> str:
         attempt_state = AttemptState.NOT_STARTED
         try:
+            if stop_event is not None and stop_event.is_set():
+                return "stopped"
             candidate = self.ui.find_target_card(self.config.title_keyword)
             if candidate is None:
                 self.logger.debug("no matching card found")
                 return "not_found"
+            if stop_event is not None and stop_event.is_set():
+                return "stopped"
             if self.state.seen(candidate.fingerprint):
                 self.logger.debug("card already submitted; fingerprint=%s", candidate.fingerprint)
                 return "already_submitted"
@@ -73,6 +79,8 @@ class Rusher:
 
             self.ui.open_card(candidate)
             attempt_state = AttemptState.CARD_OPENED
+            if stop_event is not None and stop_event.is_set():
+                return "stopped"
             # From this point onward, conservatively assume an insertion may be sent.
             attempt_state = AttemptState.INSERTION_SENT
             self.ui.submit_current_card()
@@ -114,6 +122,15 @@ class Rusher:
                 self.logger.info("today is not an enabled weekday; exiting")
                 emit("inactive_day")
                 return
+            if stop_event is not None and stop_event.is_set():
+                emit("stopped")
+                return
+            try:
+                self.ui.prepare_monitoring()
+            except UIError as exc:
+                self.logger.warning("could not prepare monitoring: %s", exc)
+                emit("unsafe_state")
+                return
             while True:
                 if stop_event is not None and stop_event.is_set():
                     emit("stopped")
@@ -125,8 +142,10 @@ class Rusher:
                     and self.config.rush_start <= now.time() < self.config.rush_end
                 )
                 emit("rush_waiting" if is_rush else "waiting")
-                result = self.scan_once()
+                result = self.scan_once(stop_event=stop_event)
                 emit(result)
+                if result == "stopped":
+                    return
                 if result == "dry_run":
                     self.logger.info("recognition test completed; exiting")
                     return
@@ -137,7 +156,6 @@ class Rusher:
                     "unsafe_state",
                     "unsafe_state_after_attempt",
                     "timeout",
-                    "already_submitted",
                 }:
                     self.logger.info("terminal scan result %s; exiting without retry", result)
                     return

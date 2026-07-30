@@ -11,6 +11,7 @@ from wecom_rusher.app import (
     config_for_worker,
     load_application_config,
     persist_application_config,
+    prepare_desktop_automation,
     resolve_application_paths,
     save_title_keyword,
     status_text,
@@ -18,6 +19,31 @@ from wecom_rusher.app import (
 
 
 class AppTests(unittest.TestCase):
+    @patch("importlib.import_module")
+    def test_desktop_automation_is_preloaded_before_window_creation(self, import_module):
+        prepare_desktop_automation()
+        import_module.assert_called_once_with("pyautogui")
+
+    @patch.object(WeComRusherApp, "_build_window")
+    @patch("wecom_rusher.app.StringVar")
+    def test_opening_live_app_stays_idle_until_start_is_clicked(
+        self, _string_var, _build_window
+    ):
+        from wecom_rusher.config import Config
+        from wecom_rusher.paths import AppPaths
+
+        root = Mock()
+        paths = AppPaths.resolve(Path.cwd(), portable=True)
+        app = WeComRusherApp(
+            root,
+            Config(dry_run=False, setup_complete=True, recognition_test_passed=True),
+            Mock(),
+            paths,
+        )
+
+        scheduled_callbacks = [call.args[1] for call in root.after.call_args_list]
+        self.assertNotIn(app._start_live, scheduled_callbacks)
+
     def test_submitted_status_keeps_window_open_for_another_manual_run(self):
         app = WeComRusherApp.__new__(WeComRusherApp)
         app.status_var = Mock()
@@ -34,6 +60,19 @@ class AppTests(unittest.TestCase):
         app.detail_var.set.assert_called_once_with(
             "本轮已停止；新接龙出现后可再次开始"
         )
+
+    def test_duplicate_status_says_monitoring_continues(self):
+        app = WeComRusherApp.__new__(WeComRusherApp)
+        app.status_var = Mock()
+        app.time_var = Mock()
+        app.detail_var = Mock()
+        app.stop_button = Mock()
+        app.root = Mock()
+        app.close_scheduled = False
+
+        app._apply_status("already_submitted")
+
+        app.detail_var.set.assert_called_once_with("已跳过这张接龙，继续等待新接龙")
 
     def test_application_root_uses_executable_when_frozen(self):
         with (
@@ -86,7 +125,8 @@ class AppTests(unittest.TestCase):
             self.assertEqual(config.templates_dir, root / "templates")
             self.assertEqual(config.state_path, root / "data" / "state.json")
             self.assertEqual(config.log_path, root / "data" / "join-helper.log")
-            self.assertTrue(config.dry_run)
+            self.assertFalse(config.dry_run)
+            self.assertEqual(config.title_keyword, "下午茶|午茶")
 
     def test_test_worker_is_always_dry_run(self):
         from wecom_rusher.config import Config

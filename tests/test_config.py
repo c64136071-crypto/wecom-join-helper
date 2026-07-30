@@ -43,8 +43,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.rush_end.hour, 12)
         self.assertEqual(config.run_weekdays, ())
         self.assertTrue(config.stop_after_submission)
-        self.assertFalse(config.setup_complete)
-        self.assertFalse(config.recognition_test_passed)
+        self.assertTrue(config.setup_complete)
+        self.assertTrue(config.recognition_test_passed)
         self.assertIsInstance(config.state_path, Path)
 
     def test_empty_weekday_list_means_any_day(self):
@@ -65,5 +65,6 @@ class ConfigTests(unittest.TestCase):
             path = Path(directory) / "config.json"
             config = Config.load_or_create(path)
             self.assertTrue(path.exists())
-            self.assertTrue(config.dry_run)
+            self.assertFalse(config.dry_run)
+            self.assertTrue(config.setup_complete)
             self.assertTrue(config.stop_after_submission)

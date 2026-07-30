@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib
 import logging
 import os
 import queue
@@ -29,8 +30,6 @@ from .logging_utils import setup_file_logger
 from .runner import build_rusher
 from .settings import (
     activate_live_mode,
-    mark_recognition_test_passed,
-    needs_first_run,
     update_keyword,
 )
 from .smoke import run_smoke_test
@@ -91,6 +90,12 @@ def resolve_application_paths(
 def load_application_config(paths: AppPaths) -> Config:
     paths.ensure()
     config = Config.load_or_create(paths.config_path)
+    migrated = activate_live_mode(config)
+    if migrated.title_keyword.strip() == "下午茶":
+        migrated = replace(migrated, title_keyword="下午茶|午茶")
+    if migrated != config:
+        migrated.write_json(paths.config_path)
+    config = migrated
     return config.with_runtime_paths(
         templates_dir=paths.templates_dir,
         state_path=paths.state_path,
@@ -110,6 +115,11 @@ def setup_logging(path: Path) -> logging.Logger:
     return setup_file_logger(path)
 
 
+def prepare_desktop_automation() -> None:
+    """Load DPI-sensitive automation libraries before Tk creates a window."""
+    importlib.import_module("pyautogui")
+
+
 class WeComRusherApp:
     def __init__(self, root: Tk, config: Config, logger: logging.Logger, paths: AppPaths):
         self.root = root
@@ -121,19 +131,12 @@ class WeComRusherApp:
         self.stop_event = threading.Event()
         self.status_queue: queue.Queue[str] = queue.Queue()
         self.worker: threading.Thread | None = None
-        self.worker_mode: str | None = None
         self.close_scheduled = False
 
-        self.status_var = StringVar(value=status_text("starting"))
+        self.status_var = StringVar(value=status_text("ready"))
         self.time_var = StringVar(value="尚未扫描")
-        self.detail_var = StringVar(value="请保持企业微信目标群窗口可见")
+        self.detail_var = StringVar(value="点击开始后监控；点击停止后不会自动恢复")
         self._build_window()
-        if needs_first_run(self.config):
-            self.status_var.set(status_text("first_run"))
-            self.detail_var.set("打开目标群后，先进行无点击识别测试")
-            self._configure_setup_controls()
-        else:
-            self.root.after(150, self._start_live)
         self.root.after(100, self._drain_status_queue)
 
     def _build_window(self) -> None:
@@ -215,18 +218,6 @@ class WeComRusherApp:
             font=("Microsoft YaHei UI", 9),
         )
         self.start_button.pack(side=RIGHT, padx=(0, 8))
-        self.test_button = Button(
-            footer,
-            text="测试识别",
-            command=self._start_test,
-            width=10,
-            bg="#ffffff",
-            fg="#1f6f54",
-            relief="solid",
-            borderwidth=1,
-            font=("Microsoft YaHei UI", 9),
-        )
-        self.test_button.pack(side=RIGHT, padx=(0, 8))
         self.settings_button = Button(
             footer,
             text="设置关键词",
@@ -239,43 +230,21 @@ class WeComRusherApp:
         )
         self.settings_button.pack(side=RIGHT, padx=(0, 10))
 
-    def _configure_setup_controls(self) -> None:
-        self.start_button.configure(
-            text="启用正式模式",
-            command=self._enable_live_mode,
-            state="normal" if self.config.recognition_test_passed else "disabled",
-        )
-        self.test_button.configure(state="normal")
-        self.stop_button.configure(state="disabled")
-
     def _configure_live_controls(self) -> None:
         self.start_button.configure(text="开始", command=self._start_live, state="normal")
-        self.test_button.configure(state="normal")
         self.stop_button.configure(state="disabled")
 
-    def _start_test(self) -> None:
-        self._start_worker(test_mode=True)
-
     def _start_live(self) -> None:
-        if needs_first_run(self.config):
-            self._configure_setup_controls()
-            return
-        self._start_worker(test_mode=False)
+        self._start_worker()
 
-    def _start_worker(self, *, test_mode: bool) -> None:
+    def _start_worker(self) -> None:
         if self.worker is not None and self.worker.is_alive():
             return
         self.stop_event = threading.Event()
-        self.worker_mode = "test" if test_mode else "live"
-        worker_config = config_for_worker(self.config, test_mode=test_mode)
-        rusher = build_rusher(worker_config, self.logger)
+        rusher = build_rusher(self.config, self.logger)
         self.start_button.configure(state="disabled")
-        self.test_button.configure(state="disabled")
         self.settings_button.configure(state="disabled")
         self.stop_button.configure(state="normal", text="停止", command=self._request_stop)
-        if test_mode:
-            self.status_var.set(status_text("testing"))
-            self.detail_var.set("仅识别标题和接龙卡片，不发送鼠标输入")
 
         def run() -> None:
             try:
@@ -306,26 +275,22 @@ class WeComRusherApp:
             self.worker = None
             self.stop_button.configure(state="disabled")
             self.settings_button.configure(state="normal")
-            if self.worker_mode == "test" and self.config.recognition_test_passed:
-                self._configure_setup_controls()
-            elif not self.close_scheduled and not needs_first_run(self.config):
+            if not self.close_scheduled:
                 self._configure_live_controls()
-            self.worker_mode = None
             return
         self.status_var.set(status_text(status))
         self.time_var.set(f"最后更新：{datetime.now():%H:%M:%S}")
         if status == "rush_waiting":
             self.detail_var.set("正在高频检查固定群中的下午茶接龙")
         elif status in {"waiting", "not_found"}:
-            self.detail_var.set("请保持企业微信目标群窗口可见")
+            self.detail_var.set("企微完整可见时监控；被遮挡或最小化时自动暂停")
         elif status == "dry_run":
-            self.config = mark_recognition_test_passed(self.config)
-            persist_application_config(self.config_path, self.config)
-            self.detail_var.set("识别测试通过，可以启用正式模式")
-            self._configure_setup_controls()
+            self.detail_var.set("当前配置为测试模式，未执行真实提交")
         elif status == "submitted":
             self.detail_var.set("本轮已停止；新接龙出现后可再次开始")
             self.stop_button.configure(state="disabled")
+        elif status == "already_submitted":
+            self.detail_var.set("已跳过这张接龙，继续等待新接龙")
         elif status in {
             "timeout",
             "unsafe_state",
@@ -345,17 +310,6 @@ class WeComRusherApp:
         self.status_var.set("正在停止")
         self.stop_button.configure(state="disabled")
 
-    def _enable_live_mode(self) -> None:
-        try:
-            self.config = activate_live_mode(self.config)
-            persist_application_config(self.config_path, self.config)
-        except Exception as exc:
-            messagebox.showerror("无法启用", str(exc), parent=self.root)
-            return
-        self.status_var.set(status_text("ready"))
-        self.detail_var.set("正式模式已启用；点击开始或下次直接启动")
-        self._configure_live_controls()
-
     def _edit_keyword(self) -> None:
         keyword = simpledialog.askstring(
             "设置接龙关键词",
@@ -372,9 +326,9 @@ class WeComRusherApp:
             messagebox.showerror("保存失败", str(exc), parent=self.root)
             return
         self.stop_event.set()
-        self.status_var.set(status_text("first_run"))
-        self.detail_var.set("关键词已更新，请重新进行识别测试")
-        self._configure_setup_controls()
+        self.status_var.set(status_text("ready"))
+        self.detail_var.set("关键词已更新；点击开始后生效")
+        self._configure_live_controls()
 
     def _close(self) -> None:
         self.stop_event.set()
@@ -407,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
         root.destroy()
         return 2
 
+    prepare_desktop_automation()
     root = Tk()
     WeComRusherApp(root, config, logger, paths)
     root.mainloop()

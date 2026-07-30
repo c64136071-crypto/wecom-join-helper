@@ -32,16 +32,16 @@ spacing before keyword comparison.
 
 ```mermaid
 flowchart TD
-    S["Capture visible group"] --> G{"Group signature unchanged?"}
+    S["Check target window visibility"] --> V{"Fully visible?"}
+    V -- No --> WAIT["Pause without clicking"]
+    V -- Yes --> G{"Group signature unchanged?"}
     G -- No --> STOP["Stop: unsafe state"]
     G -- Yes --> P["Pair yellow icons and participation buttons"]
     P --> T["OCR each nearby title crop"]
     T --> K{"Configured keyword matches?"}
-    K -- No --> WAIT["Wait without clicking"]
+    K -- No --> WAIT
     K -- Yes --> L["Choose latest matching card"]
-    L --> TEST{"Recognition test?"}
-    TEST -- Yes --> DONE["Report success without input"]
-    TEST -- No --> ATTEMPT["Enter one-attempt flow"]
+    L --> ATTEMPT["Enter one-attempt flow"]
 ```
 
 ## One-Attempt State Machine

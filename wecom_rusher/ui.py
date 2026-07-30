@@ -235,6 +235,46 @@ class WeComUI:
         ]
         return self._select_window(windows, "Enterprise WeChat document")
 
+    def prepare_monitoring(self) -> None:
+        window = self._main_window()
+        try:
+            if window.is_minimized():
+                window.restore()
+            window.set_focus()
+            time.sleep(0.3)
+        except Exception as exc:
+            raise UIError(f"could not bring Enterprise WeChat to foreground: {exc}") from exc
+
+    @staticmethod
+    def _is_window_fully_visible(window: Any) -> bool:
+        try:
+            import win32con
+            import win32gui
+
+            handle = int(window.handle)
+            if win32gui.IsIconic(handle) or not win32gui.IsWindowVisible(handle):
+                return False
+            left, top, right, bottom = win32gui.GetWindowRect(handle)
+            other = win32gui.GetWindow(handle, win32con.GW_HWNDPREV)
+            while other:
+                if win32gui.IsWindowVisible(other) and not win32gui.IsIconic(other):
+                    extended_style = win32gui.GetWindowLong(other, win32con.GWL_EXSTYLE)
+                    if not extended_style & win32con.WS_EX_TRANSPARENT:
+                        other_left, other_top, other_right, other_bottom = win32gui.GetWindowRect(
+                            other
+                        )
+                        overlap_width = min(right, other_right) - max(left, other_left)
+                        overlap_height = min(bottom, other_bottom) - max(top, other_top)
+                        if overlap_width > 2 and overlap_height > 2:
+                            return False
+                other = win32gui.GetWindow(other, win32con.GW_HWNDPREV)
+            return True
+        except (AttributeError, ImportError, OSError, TypeError, ValueError):
+            try:
+                return not window.is_minimized()
+            except Exception:
+                return False
+
     @staticmethod
     def _bounds(window: Any) -> tuple[int, int, int, int]:
         rectangle = window.rectangle()
@@ -246,7 +286,7 @@ class WeComUI:
         return left, top, width, height
 
     def _screenshot(
-        self, window: Any, *, focus_window: bool = True
+        self, window: Any, *, focus_window: bool = False
     ) -> tuple[Any, tuple[int, int, int, int]]:
         try:
             import pyautogui
@@ -319,7 +359,10 @@ class WeComUI:
 
     def find_target_card(self, title_keyword: str) -> CardCandidate | None:
         window = self._main_window()
-        screenshot, bounds = self._screenshot(window)
+        if not self._is_window_fully_visible(window):
+            self.logger.debug("Enterprise WeChat is obscured or minimized; scan paused")
+            return None
+        screenshot, bounds = self._screenshot(window, focus_window=False)
         self._verify_group_header(screenshot)
         icons = self._matches(screenshot, "yellow_icon")
         buttons = self._matches(screenshot, "participate")

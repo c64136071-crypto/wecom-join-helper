@@ -10,8 +10,9 @@ def normalize_ocr_text(text: str) -> str:
 
 
 def keyword_matches(text: str, keyword: str) -> bool:
-    clean_keyword = normalize_ocr_text(keyword)
-    return bool(clean_keyword) and clean_keyword in normalize_ocr_text(text)
+    clean_text = normalize_ocr_text(text)
+    aliases = (normalize_ocr_text(alias) for alias in keyword.split("|"))
+    return any(alias and alias in clean_text for alias in aliases)
 
 
 class OCRReader:

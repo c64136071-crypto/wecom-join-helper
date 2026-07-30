@@ -6,6 +6,23 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-07-30
+
+### Changed
+
+- Open the desktop app idle and require an explicit Start after every Stop or
+  relaunch.
+- Focus WeCom only once when monitoring starts, pause scans while its window is
+  obscured, and keep fully visible split-screen layouts usable.
+- Removed the mandatory recognition-test activation flow.
+- Keep monitoring after a previously processed card is seen.
+
+### Fixed
+
+- Match both `下午茶` and `午茶` with the default title filter.
+- Preload DPI-sensitive automation support before creating the Tk window to
+  prevent the initial window-size jump on scaled displays.
+
 ## [1.0.4] - 2026-07-21
 
 ### Fixed

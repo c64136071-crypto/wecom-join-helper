@@ -19,7 +19,7 @@ def _parse_time(value: str, field_name: str) -> time:
 
 @dataclass(frozen=True)
 class Config:
-    title_keyword: str = "下午茶"
+    title_keyword: str = "下午茶|午茶"
     window_title_keyword: str = "企业微信|WeCom"
     document_window_title_keyword: str = "企业微信-文档"
     run_weekdays: tuple[int, ...] = ()
@@ -29,9 +29,9 @@ class Config:
     rush_end: time = time(12, 0)
     match_threshold: float = 0.88
     action_timeout_seconds: float = 8.0
-    dry_run: bool = True
-    setup_complete: bool = False
-    recognition_test_passed: bool = False
+    dry_run: bool = False
+    setup_complete: bool = True
+    recognition_test_passed: bool = True
     stop_after_submission: bool = True
     templates_dir: Path = Path("templates")
     state_path: Path = Path("state.json")

@@ -25,6 +25,12 @@ class OCRTests(unittest.TestCase):
         self.assertTrue(keyword_matches("7月16日 下午茶接龙登记", "下午 茶"))
         self.assertFalse(keyword_matches("团建报名接龙", "下午茶"))
 
+    def test_keyword_match_accepts_pipe_separated_aliases(self):
+        keyword = "下午茶|午茶"
+        self.assertTrue(keyword_matches("7月30午茶接龙登记", keyword))
+        self.assertTrue(keyword_matches("7月31日下午茶接龙登记", keyword))
+        self.assertFalse(keyword_matches("团建报名接龙", keyword))
+
     def test_reader_combines_detected_lines(self):
         reader = OCRReader(engine=FakeEngine())
         self.assertEqual(reader.read(object()), "7月16日下午茶接龙登记")

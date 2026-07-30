@@ -6,7 +6,7 @@ from .config import Config
 
 
 def needs_first_run(config: Config) -> bool:
-    return not config.setup_complete or config.dry_run
+    return False
 
 
 def mark_recognition_test_passed(config: Config) -> Config:
@@ -14,9 +14,12 @@ def mark_recognition_test_passed(config: Config) -> Config:
 
 
 def activate_live_mode(config: Config) -> Config:
-    if not config.recognition_test_passed:
-        raise ValueError("a successful recognition test is required")
-    return replace(config, dry_run=False, setup_complete=True)
+    return replace(
+        config,
+        dry_run=False,
+        setup_complete=True,
+        recognition_test_passed=True,
+    )
 
 
 def update_keyword(config: Config, keyword: str) -> Config:
@@ -26,7 +29,4 @@ def update_keyword(config: Config, keyword: str) -> Config:
     return replace(
         config,
         title_keyword=clean,
-        dry_run=True,
-        setup_complete=False,
-        recognition_test_passed=False,
     )

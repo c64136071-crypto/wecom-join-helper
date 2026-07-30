@@ -66,6 +66,41 @@ class TemplateStoreTests(unittest.TestCase):
             with self.assertRaises(UIError):
                 ui._document_window()
 
+    def test_prepare_monitoring_focuses_main_window_once(self):
+        ui = WeComUI(Config())
+        window = Mock()
+        window.is_minimized.return_value = False
+        ui._main_window = Mock(return_value=window)
+
+        ui.prepare_monitoring()
+
+        window.set_focus.assert_called_once_with()
+
+    def test_find_target_card_does_not_focus_window_during_scan(self):
+        ui = WeComUI(Config())
+        window = Mock()
+        screenshot = Image.new("RGB", (1000, 600), "white")
+        ui._main_window = Mock(return_value=window)
+        ui._is_window_fully_visible = Mock(return_value=True)
+        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 1000, 600)))
+        ui._matches = Mock(return_value=[])
+        ui._verify_group_header = Mock()
+
+        self.assertIsNone(ui.find_target_card("下午茶|午茶"))
+
+        ui._screenshot.assert_called_once_with(window, focus_window=False)
+
+    def test_find_target_card_pauses_when_window_is_obscured(self):
+        ui = WeComUI(Config())
+        window = Mock()
+        ui._main_window = Mock(return_value=window)
+        ui._is_window_fully_visible = Mock(return_value=False)
+        ui._screenshot = Mock()
+
+        self.assertIsNone(ui.find_target_card("下午茶|午茶"))
+
+        ui._screenshot.assert_not_called()
+
     def test_safe_commit_point_is_outside_the_document_list(self):
         self.assertEqual(safe_commit_point((0, 0, 3840, 2088)), (3720, 1044))
 

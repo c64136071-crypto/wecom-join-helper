@@ -13,8 +13,8 @@ group sign-up card, inserts the current WeCom identity once, and stops.
 - Chinese OCR title filtering with a configurable keyword.
 - Multi-scale visual matching for common window sizes and high-DPI displays.
 - A group-header guard that stops when the visible conversation changes.
-- A no-input recognition test before live mode can be enabled.
-- One insertion attempt per launch, with no retry after the attempt starts.
+- Manual start/stop monitoring with no automatic restart after Stop or relaunch.
+- One insertion attempt per card, with no retry after the attempt starts.
 - Installer and portable Windows builds with SHA-256 checksums.
 - Local settings and redacted rotating logs; no cloud service is involved.
 
@@ -44,15 +44,15 @@ not disable Windows security features to install the application.
 ## Quick Start
 
 1. Sign in to WeCom and open the intended group.
-2. Start Join Helper and set a stable keyword from the card title, such as
-   `下午茶`.
-3. Keep the target group visible and choose **Test Recognition**. This mode
-   sends no mouse input.
-4. After the test passes, enable live mode.
-5. On later launches, open the target group first and then start Join Helper.
+2. Start Join Helper and set stable title keywords separated by `|`, such as
+   `下午茶|午茶`.
+3. Keep the complete target group window visible and click **Start**.
+4. Click **Stop** to end monitoring. It stays stopped after relaunch until
+   **Start** is clicked again.
 
-The application exits after success, timeout, a duplicate card, or an unsafe
-UI state. It does not continue scanning after an insertion attempt.
+Monitoring pauses while WeCom is minimized or obscured. A processed duplicate
+is skipped while monitoring continues for a new card. The current run stops
+after success, timeout, or an unsafe UI state.
 
 ![Synthetic three-state demonstration](docs/assets/join-helper-demo.gif)
 
@@ -102,10 +102,10 @@ See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), and
 这是一个非官方 Windows 企业微信接龙辅助工具，并非企业微信或腾讯官方产品。
 
 1. 登录企业微信并打开目标群。
-2. 启动“接龙助手”，设置标题关键词，例如“下午茶”。
-3. 首次使用先点“测试识别”；测试模式不会发送鼠标点击。
-4. 识别成功后启用正式模式。
-5. 正式模式只尝试接龙一次，成功或异常后立即停止，不会重复点击。
+2. 启动“接龙助手”，设置标题关键词，例如“下午茶|午茶”。
+3. 保持目标群窗口完整可见，然后点击“开始”。
+4. 点击“停止”后监控彻底结束；重新打开软件也不会自动开始。
+5. 已处理的旧卡片会跳过并继续等待新卡片，每张卡只尝试接龙一次。
 
 请仅在获得授权并符合所在组织规定的情况下使用。程序不会处理登录、二维码、
 验证码或安全验证窗口。

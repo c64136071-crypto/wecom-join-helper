@@ -16,6 +16,10 @@ class FakeUI:
         self.candidate = candidate
         self.opened = 0
         self.submitted = 0
+        self.prepared = 0
+
+    def prepare_monitoring(self):
+        self.prepared += 1
 
     def find_target_card(self, keyword):
         return self.candidate
@@ -55,6 +59,16 @@ class FailingVerifyUI(FakeUI):
         raise UIError("document disappeared after insertion")
 
 
+class StopDuringFindUI(FakeUI):
+    def __init__(self, candidate, stop_event):
+        super().__init__(candidate)
+        self.stop_event = stop_event
+
+    def find_target_card(self, keyword):
+        self.stop_event.set()
+        return self.candidate
+
+
 class RunnerTests(unittest.TestCase):
     def make_config(self, dry_run=False, **overrides):
         return Config(dry_run=dry_run, **overrides)
@@ -70,6 +84,23 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(ui.submitted, 1)
             self.assertTrue(state.seen("card-1"))
             self.assertEqual(notifier.events[0][0], "submitted")
+
+    def test_stop_during_recognition_prevents_card_click(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stop_event = threading.Event()
+            state = SubmissionState(Path(directory) / "state.json")
+            ui = StopDuringFindUI(
+                CardCandidate("card-1", "7月30午茶接龙登记", (10, 20)),
+                stop_event,
+            )
+
+            result = Rusher(
+                self.make_config(), ui, state, FakeNotifier()
+            ).scan_once(stop_event=stop_event)
+
+            self.assertEqual(result, "stopped")
+            self.assertEqual(ui.opened, 0)
+            self.assertEqual(ui.submitted, 0)
 
     def test_skips_duplicate_card(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -118,6 +149,29 @@ class RunnerTests(unittest.TestCase):
                 clock.now.return_value = datetime(2026, 7, 16, 11, 30)
                 rusher.run_forever()
             self.assertEqual(ui.submitted, 1)
+            self.assertEqual(ui.prepared, 1)
+
+    def test_duplicate_card_keeps_monitoring_until_stopped(self):
+        class StopAfterFirstWait:
+            def is_set(self):
+                return False
+
+            def wait(self, _interval):
+                return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            state = SubmissionState(Path(directory) / "state.json")
+            state.record("card-1", "old")
+            ui = FakeUI(CardCandidate("card-1", "title", (10, 20)))
+            rusher = Rusher(self.make_config(), ui, state, FakeNotifier())
+            statuses = []
+
+            rusher.run_forever(
+                stop_event=StopAfterFirstWait(), status_callback=statuses.append
+            )
+
+            self.assertEqual(statuses[-2:], ["already_submitted", "stopped"])
+            self.assertEqual(ui.opened, 0)
 
     def test_continuous_runner_exits_on_non_configured_weekday(self):
         with tempfile.TemporaryDirectory() as directory:

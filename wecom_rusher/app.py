@@ -43,6 +43,7 @@ STATUS_TEXT = {
     "waiting": "等待接龙",
     "rush_waiting": "高频监控中（11:00-12:00）",
     "not_found": "等待接龙",
+    "paused": "已暂停扫描",
     "dry_run": "测试识别成功，未执行提交",
     "submitted": "接龙成功，企微可能需要重新登录",
     "already_submitted": "本次接龙已经处理",
@@ -241,7 +242,11 @@ class WeComRusherApp:
         if self.worker is not None and self.worker.is_alive():
             return
         self.stop_event = threading.Event()
-        rusher = build_rusher(self.config, self.logger)
+        rusher = build_rusher(
+            self.config,
+            self.logger,
+            assistant_window_handle=self.root.winfo_id(),
+        )
         self.start_button.configure(state="disabled")
         self.settings_button.configure(state="disabled")
         self.stop_button.configure(state="normal", text="停止", command=self._request_stop)
@@ -283,7 +288,9 @@ class WeComRusherApp:
         if status == "rush_waiting":
             self.detail_var.set("正在高频检查固定群中的下午茶接龙")
         elif status in {"waiting", "not_found"}:
-            self.detail_var.set("企微完整可见时监控；被遮挡或最小化时自动暂停")
+            self.detail_var.set("正在置顶企业微信并检查目标群接龙")
+        elif status == "paused":
+            self.detail_var.set("助手窗口在前台，当前暂停扫描；切回企微后会继续")
         elif status == "dry_run":
             self.detail_var.set("当前配置为测试模式，未执行真实提交")
         elif status == "submitted":

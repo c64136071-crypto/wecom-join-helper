@@ -50,7 +50,10 @@ not disable Windows security features to install the application.
 4. Click **Stop** to end monitoring. It stays stopped after relaunch until
    **Start** is clicked again.
 
-Monitoring pauses while WeCom is minimized or obscured. A processed duplicate
+Join Helper brings WeCom forward once when **Start** is clicked. It continues
+scanning while WeCom is visible, ignores WeCom-owned popups, and brings WeCom
+back only when another application covers it. Opening Join Helper pauses scans
+without taking focus back, so **Stop** remains available. A processed duplicate
 is skipped while monitoring continues for a new card. The current run stops
 after success, timeout, or an unsafe UI state.
 

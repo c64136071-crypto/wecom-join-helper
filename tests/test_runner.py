@@ -8,7 +8,7 @@ from unittest.mock import patch
 from wecom_rusher.config import Config
 from wecom_rusher.runner import Rusher
 from wecom_rusher.state import SubmissionState
-from wecom_rusher.ui import CardCandidate, UIError
+from wecom_rusher.ui import CardCandidate, MonitoringPaused, UIError
 
 
 class FakeUI:
@@ -67,6 +67,11 @@ class StopDuringFindUI(FakeUI):
     def find_target_card(self, keyword):
         self.stop_event.set()
         return self.candidate
+
+
+class PausedUI(FakeUI):
+    def find_target_card(self, keyword):
+        raise MonitoringPaused("Join Helper is in the foreground")
 
 
 class RunnerTests(unittest.TestCase):
@@ -171,6 +176,26 @@ class RunnerTests(unittest.TestCase):
             )
 
             self.assertEqual(statuses[-2:], ["already_submitted", "stopped"])
+            self.assertEqual(ui.opened, 0)
+
+    def test_paused_scan_keeps_monitoring_until_stopped(self):
+        class StopAfterFirstWait:
+            def is_set(self):
+                return False
+
+            def wait(self, _interval):
+                return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            state = SubmissionState(Path(directory) / "state.json")
+            ui = PausedUI(None)
+            statuses = []
+
+            Rusher(self.make_config(), ui, state, FakeNotifier()).run_forever(
+                stop_event=StopAfterFirstWait(), status_callback=statuses.append
+            )
+
+            self.assertEqual(statuses[-2:], ["paused", "stopped"])
             self.assertEqual(ui.opened, 0)
 
     def test_continuous_runner_exits_on_non_configured_weekday(self):

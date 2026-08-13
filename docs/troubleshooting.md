@@ -5,11 +5,12 @@
 1. Confirm WeCom is logged in and the intended group is the visible chat.
 2. Scroll until the complete sign-up card and participation button are visible.
 3. Use a short title keyword that is stable and unique to the intended card.
-4. Keep the complete WeCom window visible while monitoring runs.
+4. Click **Start** with the intended group open. Join Helper ignores WeCom's
+   own popups, returns WeCom to the foreground only if another application
+   covers it, and pauses while the Join Helper window itself is active.
 5. Check the compatibility table for the currently verified WeCom version.
 
-Join Helper pauses while WeCom is minimized or covered by another window. A
-missing result is safer than clicking an uncertain card.
+A missing result is safer than clicking an uncertain card.
 
 ## Monitoring Does Not Restart
 

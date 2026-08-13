@@ -90,10 +90,26 @@ class AppTests(unittest.TestCase):
 
     def test_status_text_is_clear_for_user_visible_states(self):
         self.assertEqual(status_text("waiting"), "等待接龙")
+        self.assertEqual(status_text("paused"), "已暂停扫描")
         self.assertEqual(status_text("rush_waiting"), "高频监控中（11:00-12:00）")
         self.assertEqual(status_text("submitted"), "接龙成功，企微可能需要重新登录")
         self.assertEqual(status_text("unsafe_state"), "界面状态异常，已停止且不会重试")
         self.assertEqual(status_text("timeout"), "未确认成功，已停止且不会重试")
+
+    def test_paused_status_explains_how_to_resume_scanning(self):
+        app = WeComRusherApp.__new__(WeComRusherApp)
+        app.status_var = Mock()
+        app.time_var = Mock()
+        app.detail_var = Mock()
+        app.stop_button = Mock()
+        app.root = Mock()
+        app.close_scheduled = False
+
+        app._apply_status("paused")
+
+        app.detail_var.set.assert_called_once_with(
+            "助手窗口在前台，当前暂停扫描；切回企微后会继续"
+        )
 
     def test_save_title_keyword_preserves_other_config(self):
         with tempfile.TemporaryDirectory() as directory:

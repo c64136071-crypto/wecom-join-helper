@@ -11,7 +11,7 @@ from .config import Config
 from .notify import Notifier
 from .schedule import PollSchedule
 from .state import SubmissionState
-from .ui import CardCandidate, UIError, WeComUI
+from .ui import CardCandidate, MonitoringPaused, UIError, WeComUI
 
 
 class UIAdapter(Protocol):
@@ -97,6 +97,9 @@ class Rusher:
             attempt_state = AttemptState.TERMINAL
             self.notifier.notify("timeout", "未确认提交成功；不会重试")
             return "timeout"
+        except MonitoringPaused as exc:
+            self.logger.info("monitoring paused: %s", exc)
+            return "paused"
         except UIError as exc:
             after_attempt = attempt_state in {
                 AttemptState.INSERTION_SENT,
@@ -179,6 +182,16 @@ class Rusher:
             self.state.save()
 
 
-def build_rusher(config: Config, logger: logging.Logger) -> Rusher:
+def build_rusher(
+    config: Config,
+    logger: logging.Logger,
+    assistant_window_handle: int | None = None,
+) -> Rusher:
     state = SubmissionState(config.state_path)
-    return Rusher(config, WeComUI(config, logger), state, Notifier(logger), logger)
+    return Rusher(
+        config,
+        WeComUI(config, logger, assistant_window_handle=assistant_window_handle),
+        state,
+        Notifier(logger),
+        logger,
+    )

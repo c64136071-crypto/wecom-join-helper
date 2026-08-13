@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 
 from wecom_rusher.config import Config
 from wecom_rusher.ui import (
+    MonitoringPaused,
     TemplateStore,
     UIError,
     WeComUI,
@@ -76,12 +77,14 @@ class TemplateStoreTests(unittest.TestCase):
 
         window.set_focus.assert_called_once_with()
 
-    def test_find_target_card_does_not_focus_window_during_scan(self):
+    def test_find_target_card_does_not_refocus_visible_wecom_during_scan(self):
         ui = WeComUI(Config())
         window = Mock()
+        window.is_minimized.return_value = False
         screenshot = Image.new("RGB", (1000, 600), "white")
         ui._main_window = Mock(return_value=window)
-        ui._is_window_fully_visible = Mock(return_value=True)
+        ui._assistant_is_foreground = Mock(return_value=False)
+        ui._is_window_obscured = Mock(return_value=False)
         ui._screenshot = Mock(return_value=(screenshot, (0, 0, 1000, 600)))
         ui._matches = Mock(return_value=[])
         ui._verify_group_header = Mock()
@@ -90,15 +93,35 @@ class TemplateStoreTests(unittest.TestCase):
 
         ui._screenshot.assert_called_once_with(window, focus_window=False)
 
-    def test_find_target_card_pauses_when_window_is_obscured(self):
+    def test_find_target_card_refocuses_wecom_when_external_window_covers_it(self):
         ui = WeComUI(Config())
         window = Mock()
+        window.is_minimized.return_value = False
+        screenshot = Image.new("RGB", (1000, 600), "white")
         ui._main_window = Mock(return_value=window)
-        ui._is_window_fully_visible = Mock(return_value=False)
-        ui._screenshot = Mock()
+        ui._assistant_is_foreground = Mock(return_value=False)
+        ui._is_window_obscured = Mock(side_effect=[True, False])
+        ui.prepare_monitoring = Mock()
+        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 1000, 600)))
+        ui._matches = Mock(return_value=[])
+        ui._verify_group_header = Mock()
 
         self.assertIsNone(ui.find_target_card("下午茶|午茶"))
 
+        ui.prepare_monitoring.assert_called_once_with()
+        ui._screenshot.assert_called_once_with(window, focus_window=False)
+
+    def test_find_target_card_pauses_when_helper_is_foreground(self):
+        ui = WeComUI(Config())
+        ui._main_window = Mock()
+        ui._assistant_is_foreground = Mock(return_value=True)
+        ui.prepare_monitoring = Mock()
+        ui._screenshot = Mock()
+
+        with self.assertRaises(MonitoringPaused):
+            ui.find_target_card("下午茶|午茶")
+
+        ui.prepare_monitoring.assert_not_called()
         ui._screenshot.assert_not_called()
 
     def test_safe_commit_point_is_outside_the_document_list(self):

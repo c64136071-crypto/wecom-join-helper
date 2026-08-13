@@ -21,6 +21,10 @@ class UIError(RuntimeError):
     """Raised when the visible UI is not in a safe expected state."""
 
 
+class MonitoringPaused(UIError):
+    """Raised when the helper is in front and must not steal focus."""
+
+
 class TemplateStore:
     _required = ("yellow_icon", "participate", "join", "submit")
 
@@ -116,12 +120,18 @@ class WeComUI:
     _allowed_executable_names = {"wxwork.exe", "wxworkweb.exe"}
     _document_executable_names = _allowed_executable_names | {"wemail.exe"}
 
-    def __init__(self, config: Config, logger: logging.Logger | None = None):
+    def __init__(
+        self,
+        config: Config,
+        logger: logging.Logger | None = None,
+        assistant_window_handle: int | None = None,
+    ):
         self.config = config
         self.logger = logger or logging.getLogger(__name__)
         self.templates = TemplateStore(config.templates_dir)
         self.ocr = OCRReader()
         self._group_signature: bytes | None = None
+        self.assistant_window_handle = assistant_window_handle
 
     @staticmethod
     def _window_executable_name(window: Any) -> str:
@@ -246,34 +256,75 @@ class WeComUI:
             raise UIError(f"could not bring Enterprise WeChat to foreground: {exc}") from exc
 
     @staticmethod
-    def _is_window_fully_visible(window: Any) -> bool:
+    def _window_handle(window: Any) -> int | None:
         try:
-            import win32con
-            import win32gui
+            handle = getattr(window, "handle", None)
+            if handle is None:
+                handle = getattr(window.element_info, "handle", None)
+            handle = int(handle)
+            return handle if handle > 0 else None
+        except (AttributeError, TypeError, ValueError):
+            return None
 
-            handle = int(window.handle)
-            if win32gui.IsIconic(handle) or not win32gui.IsWindowVisible(handle):
-                return False
-            left, top, right, bottom = win32gui.GetWindowRect(handle)
-            other = win32gui.GetWindow(handle, win32con.GW_HWNDPREV)
-            while other:
-                if win32gui.IsWindowVisible(other) and not win32gui.IsIconic(other):
-                    extended_style = win32gui.GetWindowLong(other, win32con.GWL_EXSTYLE)
-                    if not extended_style & win32con.WS_EX_TRANSPARENT:
-                        other_left, other_top, other_right, other_bottom = win32gui.GetWindowRect(
-                            other
+    def _assistant_is_foreground(self) -> bool:
+        if not self.assistant_window_handle:
+            return False
+        try:
+            import ctypes
+
+            return int(ctypes.windll.user32.GetForegroundWindow()) == int(
+                self.assistant_window_handle
+            )
+        except (AttributeError, OSError, TypeError, ValueError):
+            return False
+
+    def _is_window_obscured(self, window: Any) -> bool:
+        """Check only actual overlapping windows above the target in z-order."""
+        target_handle = self._window_handle(window)
+        if target_handle is None:
+            return False
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+            user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+            user32.GetWindow.restype = wintypes.HWND
+            user32.IsWindowVisible.argtypes = [wintypes.HWND]
+            user32.IsWindowVisible.restype = wintypes.BOOL
+            user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+            user32.GetWindowRect.restype = wintypes.BOOL
+            user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+
+            target_pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(target_handle, ctypes.byref(target_pid))
+            left, top, width, height = self._bounds(window)
+            right, bottom = left + width, top + height
+            current = int(user32.GetWindow(target_handle, 3) or 0)  # GW_HWNDPREV
+            while current:
+                if bool(user32.IsWindowVisible(current)):
+                    rect = wintypes.RECT()
+                    if user32.GetWindowRect(current, ctypes.byref(rect)):
+                        overlaps = (
+                            rect.left < right
+                            and rect.right > left
+                            and rect.top < bottom
+                            and rect.bottom > top
                         )
-                        overlap_width = min(right, other_right) - max(left, other_left)
-                        overlap_height = min(bottom, other_bottom) - max(top, other_top)
-                        if overlap_width > 2 and overlap_height > 2:
-                            return False
-                other = win32gui.GetWindow(other, win32con.GW_HWNDPREV)
-            return True
-        except (AttributeError, ImportError, OSError, TypeError, ValueError):
-            try:
-                return not window.is_minimized()
-            except Exception:
-                return False
+                        if overlaps:
+                            owner_pid = wintypes.DWORD()
+                            user32.GetWindowThreadProcessId(current, ctypes.byref(owner_pid))
+                            if int(owner_pid.value) != int(target_pid.value):
+                                self.logger.debug(
+                                    "Enterprise WeChat is covered by an external window; pid=%s",
+                                    owner_pid.value,
+                                )
+                                return True
+                current = int(user32.GetWindow(current, 3) or 0)
+        except (AttributeError, OSError, TypeError, ValueError):
+            self.logger.debug("could not inspect window z-order", exc_info=True)
+        return False
 
     @staticmethod
     def _bounds(window: Any) -> tuple[int, int, int, int]:
@@ -359,9 +410,17 @@ class WeComUI:
 
     def find_target_card(self, title_keyword: str) -> CardCandidate | None:
         window = self._main_window()
-        if not self._is_window_fully_visible(window):
-            self.logger.debug("Enterprise WeChat is obscured or minimized; scan paused")
-            return None
+        if self._assistant_is_foreground():
+            raise MonitoringPaused("Join Helper is in the foreground")
+        if window.is_minimized() or self._is_window_obscured(window):
+            self.prepare_monitoring()
+            window = self._main_window()
+            if (
+                self._assistant_is_foreground()
+                or window.is_minimized()
+                or self._is_window_obscured(window)
+            ):
+                raise MonitoringPaused("Enterprise WeChat is still covered")
         screenshot, bounds = self._screenshot(window, focus_window=False)
         self._verify_group_header(screenshot)
         icons = self._matches(screenshot, "yellow_icon")

@@ -6,6 +6,17 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-08-13
+
+### Fixed
+
+- Ignore WeCom-owned overlays during z-order visibility checks, preventing a
+  false obstruction from stopping every card scan.
+- Bring WeCom forward immediately after **Start**, then only return it to the
+  foreground when an external application actually covers it.
+- Pause scanning while Join Helper itself is active, so its **Stop** button can
+  be used without the application taking focus back.
+
 ## [1.0.5] - 2026-07-30
 
 ### Changed

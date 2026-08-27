@@ -6,6 +6,15 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-08-27
+
+### Fixed
+
+- Recognize keyword-matching join cards from their yellow icon when the
+  **Participate** button rendering no longer matches the bundled template.
+- Ignore mouse-transparent desktop overlays, including the NVIDIA overlay,
+  when deciding whether another application covers WeCom.
+
 ## [1.0.7] - 2026-08-27
 
 ### Fixed

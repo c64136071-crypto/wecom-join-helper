@@ -9,8 +9,10 @@ from wecom_rusher.ui import (
     TemplateStore,
     UIError,
     WeComUI,
+    infer_card_matches_from_icons,
     pair_card_matches,
     safe_commit_point,
+    window_style_can_obscure,
 )
 from wecom_rusher.vision import TemplateMatch
 
@@ -124,6 +126,34 @@ class TemplateStoreTests(unittest.TestCase):
 
         ui.prepare_monitoring.assert_not_called()
         ui._screenshot.assert_not_called()
+
+    def test_find_target_card_uses_icon_fallback_when_button_template_changes(self):
+        ui = WeComUI(Config())
+        window = Mock()
+        window.is_minimized.return_value = False
+        screenshot = Image.new("RGB", (1000, 600), "white")
+        icon = TemplateMatch(700, 300, 0.82, 1.0, 44, 45)
+        ui._main_window = Mock(return_value=window)
+        ui._assistant_is_foreground = Mock(return_value=False)
+        ui._is_window_obscured = Mock(return_value=False)
+        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 1000, 600)))
+        ui._matches = Mock(side_effect=[[icon], [], [icon]])
+        ui._verify_group_header = Mock()
+        ui.ocr.read = Mock(return_value="8月27午茶接龙登记")
+
+        candidate = ui.find_target_card("午茶")
+
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate.participate_point, (454, 371))
+
+    def test_icon_fallback_ignores_matches_outside_the_chat_area(self):
+        icons = [TemplateMatch(80, 120, 0.85, 1.0, 44, 45)]
+
+        self.assertEqual(infer_card_matches_from_icons(icons, (1000, 600)), [])
+
+    def test_mouse_transparent_overlay_cannot_obscure_wecom(self):
+        self.assertFalse(window_style_can_obscure(0x20))
+        self.assertTrue(window_style_can_obscure(0))
 
     def test_safe_commit_point_is_outside_the_document_list(self):
         self.assertEqual(safe_commit_point((0, 0, 3840, 2088)), (3720, 1044))

@@ -88,6 +88,35 @@ def pair_card_matches(
     return sorted(pairs, key=lambda pair: pair.button.y, reverse=True)
 
 
+def infer_card_matches_from_icons(
+    icons: list[TemplateMatch], screenshot_size: tuple[int, int]
+) -> list[CardVisualMatch]:
+    """Infer the join-button location when its text template has changed."""
+    width, height = screenshot_size
+    matches: list[CardVisualMatch] = []
+    for icon in icons:
+        scale = icon.scale
+        if icon.x < max(round(width * 0.28), round(340 * scale)):
+            continue
+        button = TemplateMatch(
+            icon.x - round(246 * scale),
+            icon.y + round(71 * scale),
+            icon.score,
+            scale,
+            round(122 * scale),
+            round(38 * scale),
+        )
+        if not 0 <= button.x < width or not 0 <= button.y < height:
+            continue
+        matches.append(CardVisualMatch(icon, button))
+    return sorted(matches, key=lambda pair: pair.button.y, reverse=True)
+
+
+def window_style_can_obscure(ex_style: int) -> bool:
+    """Mouse-transparent overlay windows do not hide clickable WeCom content."""
+    return not bool(ex_style & 0x20)  # WS_EX_TRANSPARENT
+
+
 def safe_commit_point(bounds: tuple[int, int, int, int]) -> tuple[int, int]:
     """Return a point in the document's right-side blank area to commit focus."""
     left, top, width, height = bounds
@@ -296,6 +325,8 @@ class WeComUI:
             user32.GetWindowRect.restype = wintypes.BOOL
             user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
             user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+            user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.GetWindowLongW.restype = ctypes.c_long
 
             target_pid = wintypes.DWORD()
             user32.GetWindowThreadProcessId(target_handle, ctypes.byref(target_pid))
@@ -304,6 +335,10 @@ class WeComUI:
             current = int(user32.GetWindow(target_handle, 3) or 0)  # GW_HWNDPREV
             while current:
                 if bool(user32.IsWindowVisible(current)):
+                    ex_style = int(user32.GetWindowLongW(current, -20))
+                    if not window_style_can_obscure(ex_style):
+                        current = int(user32.GetWindow(current, 3) or 0)
+                        continue
                     rect = wintypes.RECT()
                     if user32.GetWindowRect(current, ctypes.byref(rect)):
                         overlaps = (
@@ -376,10 +411,17 @@ class WeComUI:
             return None
         return matches[0].x, matches[0].y
 
-    def _matches(self, screenshot: Any, template_name: str) -> list[TemplateMatch]:
+    def _matches(
+        self,
+        screenshot: Any,
+        template_name: str,
+        threshold: float | None = None,
+    ) -> list[TemplateMatch]:
         template = self.templates.load(template_name)
         return locate_templates_multiscale(
-            screenshot, template, self.config.match_threshold
+            screenshot,
+            template,
+            self.config.match_threshold if threshold is None else threshold,
         )
 
     def _verify_group_header(self, screenshot: Any) -> None:
@@ -419,7 +461,25 @@ class WeComUI:
         self._verify_group_header(screenshot)
         icons = self._matches(screenshot, "yellow_icon")
         buttons = self._matches(screenshot, "participate")
-        for visual in pair_card_matches(icons, buttons):
+        visual_matches = pair_card_matches(icons, buttons)
+        relaxed_threshold = max(0.70, self.config.match_threshold - 0.10)
+        relaxed_icons = self._matches(
+            screenshot, "yellow_icon", threshold=relaxed_threshold
+        )
+        paired_icons = {(match.icon.x, match.icon.y) for match in visual_matches}
+        visual_matches.extend(
+            match
+            for match in infer_card_matches_from_icons(relaxed_icons, screenshot.size)
+            if (match.icon.x, match.icon.y) not in paired_icons
+        )
+        visual_matches.sort(key=lambda match: match.button.y, reverse=True)
+        self.logger.debug(
+            "card scan candidates; icons=%d buttons=%d visual_matches=%d",
+            len(relaxed_icons),
+            len(buttons),
+            len(visual_matches),
+        )
+        for visual in visual_matches:
             title_crop = self._title_crop(screenshot, visual)
             title = self.ocr.read(title_crop)
             self.logger.debug("OCR candidate evaluated; keyword_match=%s", keyword_matches(title, title_keyword))

@@ -6,6 +6,14 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-08-27
+
+### Fixed
+
+- Continue scanning immediately after restoring WeCom from behind another
+  application. This avoids a transient foreground-state check incorrectly
+  pausing monitoring just after WeCom is brought forward.
+
 ## [1.0.6] - 2026-08-13
 
 ### Fixed

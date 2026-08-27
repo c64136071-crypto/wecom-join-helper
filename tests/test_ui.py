@@ -100,7 +100,7 @@ class TemplateStoreTests(unittest.TestCase):
         screenshot = Image.new("RGB", (1000, 600), "white")
         ui._main_window = Mock(return_value=window)
         ui._assistant_is_foreground = Mock(return_value=False)
-        ui._is_window_obscured = Mock(side_effect=[True, False])
+        ui._is_window_obscured = Mock(return_value=True)
         ui.prepare_monitoring = Mock()
         ui._screenshot = Mock(return_value=(screenshot, (0, 0, 1000, 600)))
         ui._matches = Mock(return_value=[])
@@ -109,6 +109,7 @@ class TemplateStoreTests(unittest.TestCase):
         self.assertIsNone(ui.find_target_card("下午茶|午茶"))
 
         ui.prepare_monitoring.assert_called_once_with()
+        ui._is_window_obscured.assert_called_once_with(window)
         ui._screenshot.assert_called_once_with(window, focus_window=False)
 
     def test_find_target_card_pauses_when_helper_is_foreground(self):

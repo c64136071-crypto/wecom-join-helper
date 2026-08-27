@@ -415,12 +415,6 @@ class WeComUI:
         if window.is_minimized() or self._is_window_obscured(window):
             self.prepare_monitoring()
             window = self._main_window()
-            if (
-                self._assistant_is_foreground()
-                or window.is_minimized()
-                or self._is_window_obscured(window)
-            ):
-                raise MonitoringPaused("Enterprise WeChat is still covered")
         screenshot, bounds = self._screenshot(window, focus_window=False)
         self._verify_group_header(screenshot)
         icons = self._matches(screenshot, "yellow_icon")

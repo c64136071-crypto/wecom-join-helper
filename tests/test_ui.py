@@ -9,7 +9,6 @@ from wecom_rusher.ui import (
     TemplateStore,
     UIError,
     WeComUI,
-    infer_card_matches_from_icons,
     pair_card_matches,
     safe_commit_point,
     window_style_can_obscure,
@@ -127,29 +126,26 @@ class TemplateStoreTests(unittest.TestCase):
         ui.prepare_monitoring.assert_not_called()
         ui._screenshot.assert_not_called()
 
-    def test_find_target_card_uses_icon_fallback_when_button_template_changes(self):
+    def test_find_target_card_accepts_small_card_button_match(self):
         ui = WeComUI(Config())
         window = Mock()
         window.is_minimized.return_value = False
-        screenshot = Image.new("RGB", (1000, 600), "white")
-        icon = TemplateMatch(700, 300, 0.82, 1.0, 44, 45)
+        screenshot = Image.new("RGB", (262, 114), "white")
+        icon = TemplateMatch(231, 41, 0.946, 0.667, 29, 30)
+        button = TemplateMatch(67, 87, 0.779, 0.667, 81, 25)
         ui._main_window = Mock(return_value=window)
         ui._assistant_is_foreground = Mock(return_value=False)
         ui._is_window_obscured = Mock(return_value=False)
-        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 1000, 600)))
-        ui._matches = Mock(side_effect=[[icon], [], [icon]])
+        ui._screenshot = Mock(return_value=(screenshot, (0, 0, 262, 114)))
+        ui._matches = Mock(side_effect=[[icon], [button]])
         ui._verify_group_header = Mock()
-        ui.ocr.read = Mock(return_value="8月27午茶接龙登记")
+        ui.ocr.read = Mock(return_value="9月24日下午茶接龙登记")
 
         candidate = ui.find_target_card("午茶")
 
         self.assertIsNotNone(candidate)
-        self.assertEqual(candidate.participate_point, (454, 371))
-
-    def test_icon_fallback_ignores_matches_outside_the_chat_area(self):
-        icons = [TemplateMatch(80, 120, 0.85, 1.0, 44, 45)]
-
-        self.assertEqual(infer_card_matches_from_icons(icons, (1000, 600)), [])
+        self.assertEqual(candidate.participate_point, (67, 87))
+        self.assertEqual(ui._matches.call_args_list[1].kwargs["threshold"], 0.70)
 
     def test_mouse_transparent_overlay_cannot_obscure_wecom(self):
         self.assertFalse(window_style_can_obscure(0x20))

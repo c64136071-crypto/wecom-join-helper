@@ -88,30 +88,6 @@ def pair_card_matches(
     return sorted(pairs, key=lambda pair: pair.button.y, reverse=True)
 
 
-def infer_card_matches_from_icons(
-    icons: list[TemplateMatch], screenshot_size: tuple[int, int]
-) -> list[CardVisualMatch]:
-    """Infer the join-button location when its text template has changed."""
-    width, height = screenshot_size
-    matches: list[CardVisualMatch] = []
-    for icon in icons:
-        scale = icon.scale
-        if icon.x < max(round(width * 0.28), round(340 * scale)):
-            continue
-        button = TemplateMatch(
-            icon.x - round(246 * scale),
-            icon.y + round(71 * scale),
-            icon.score,
-            scale,
-            round(122 * scale),
-            round(38 * scale),
-        )
-        if not 0 <= button.x < width or not 0 <= button.y < height:
-            continue
-        matches.append(CardVisualMatch(icon, button))
-    return sorted(matches, key=lambda pair: pair.button.y, reverse=True)
-
-
 def window_style_can_obscure(ex_style: int) -> bool:
     """Mouse-transparent overlay windows do not hide clickable WeCom content."""
     return not bool(ex_style & 0x20)  # WS_EX_TRANSPARENT
@@ -460,22 +436,17 @@ class WeComUI:
         screenshot, bounds = self._screenshot(window, focus_window=False)
         self._verify_group_header(screenshot)
         icons = self._matches(screenshot, "yellow_icon")
-        buttons = self._matches(screenshot, "participate")
+        # The current card is rendered at 0.667x on the user's display. Its
+        # button has a lower correlation than the icon because the grey card
+        # background varies, so pair it with the strong icon before OCR.
+        participate_threshold = max(0.70, self.config.match_threshold - 0.18)
+        buttons = self._matches(
+            screenshot, "participate", threshold=participate_threshold
+        )
         visual_matches = pair_card_matches(icons, buttons)
-        relaxed_threshold = max(0.70, self.config.match_threshold - 0.10)
-        relaxed_icons = self._matches(
-            screenshot, "yellow_icon", threshold=relaxed_threshold
-        )
-        paired_icons = {(match.icon.x, match.icon.y) for match in visual_matches}
-        visual_matches.extend(
-            match
-            for match in infer_card_matches_from_icons(relaxed_icons, screenshot.size)
-            if (match.icon.x, match.icon.y) not in paired_icons
-        )
-        visual_matches.sort(key=lambda match: match.button.y, reverse=True)
         self.logger.debug(
             "card scan candidates; icons=%d buttons=%d visual_matches=%d",
-            len(relaxed_icons),
+            len(icons),
             len(buttons),
             len(visual_matches),
         )

@@ -33,6 +33,28 @@ class VisionTests(unittest.TestCase):
 
         self.assertTrue(any(abs(match.x - 65) <= 1 and abs(match.y - 55) <= 1 for match in matches))
 
+    def test_default_scales_find_two_thirds_card_rendering(self):
+        import cv2
+        import numpy as np
+
+        template = np.zeros((45, 44), dtype=np.uint8)
+        template[5:40, 8:36] = 180
+        template[12:33, 14:30] = 255
+        resized = cv2.resize(template, (29, 30), interpolation=cv2.INTER_AREA)
+        source = np.zeros((120, 120), dtype=np.uint8)
+        source[35:65, 50:79] = resized
+
+        matches = locate_templates_multiscale(source, template, threshold=0.88)
+
+        self.assertTrue(
+            any(
+                abs(match.x - 64) <= 1
+                and abs(match.y - 50) <= 1
+                and abs(match.scale - 0.667) < 0.001
+                for match in matches
+            )
+        )
+
     def test_signature_distance_detects_changed_header(self):
         import numpy as np
 

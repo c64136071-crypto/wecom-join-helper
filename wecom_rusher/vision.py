@@ -45,9 +45,27 @@ def locate_templates_multiscale(
     image: Any,
     template: Any,
     threshold: float,
-    scales: tuple[float, ...] = (0.75, 0.9, 1.0, 1.1, 1.25, 1.5),
+    scales: tuple[float, ...] = (
+        0.5,
+        0.6,
+        0.667,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        1.0,
+        1.1,
+        1.25,
+        1.5,
+    ),
 ) -> list[TemplateMatch]:
-    """Return non-overlapping template matches across common display scales."""
+    """Return non-overlapping template matches across common display scales.
+
+    WeCom cards are commonly rendered at roughly two-thirds of the calibration
+    screenshot size on a 125% Windows display. Keep that scale explicit rather
+    than relying on a loose match threshold.
+    """
     try:
         import cv2
         import numpy as np

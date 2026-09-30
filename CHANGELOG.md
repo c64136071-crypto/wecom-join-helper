@@ -6,6 +6,16 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-09-30
+
+### Fixed
+
+- Restore recognition of the current WeCom card rendering at the fractional
+  display scale used by high-DPI Windows desktops.
+- Match the lower-contrast **Participate** button only after pairing it with
+  the yellow sign-up icon and confirming the configured title keyword.
+- Remove the unsafe icon-only click-coordinate fallback.
+
 ## [1.0.8] - 2026-08-27
 
 ### Fixed

@@ -8,7 +8,7 @@ from unittest.mock import patch
 from wecom_rusher.config import Config
 from wecom_rusher.runner import Rusher
 from wecom_rusher.state import SubmissionState
-from wecom_rusher.ui import CardCandidate, MonitoringPaused, UIError
+from wecom_rusher.ui import ActionStopped, CardCandidate, MonitoringPaused, UIError
 
 
 class FakeUI:
@@ -27,7 +27,7 @@ class FakeUI:
     def open_card(self, candidate):
         self.opened += 1
 
-    def submit_current_card(self):
+    def submit_current_card(self, stop_event=None):
         self.submitted += 1
 
     def card_is_submitted(self):
@@ -43,7 +43,7 @@ class FakeNotifier:
 
 
 class FailingSubmitUI(FakeUI):
-    def submit_current_card(self):
+    def submit_current_card(self, stop_event=None):
         self.submitted += 1
         raise UIError("submit button not found")
 
@@ -75,7 +75,22 @@ class PausedUI(FakeUI):
 
 
 class RunnerTests(unittest.TestCase):
+    def test_stop_inside_document_action_is_not_recorded_as_success(self):
+        class StoppedUI(FakeUI):
+            def submit_current_card(self, stop_event=None):
+                stop_event.set()
+                raise ActionStopped("stopped")
+        with tempfile.TemporaryDirectory() as directory:
+            state = SubmissionState(Path(directory) / "state.json")
+            ui = StoppedUI(CardCandidate("card-1", "title", (10, 20)))
+            notifier = FakeNotifier()
+            result = Rusher(Config(), ui, state, notifier).scan_once(threading.Event())
+            self.assertEqual(result, "stopped")
+            self.assertFalse(state.seen("card-1"))
+            self.assertEqual(notifier.events, [])
+
     def make_config(self, dry_run=False, **overrides):
+        overrides.setdefault("normal_interval_seconds", 5.0)
         return Config(dry_run=dry_run, **overrides)
 
     def test_submits_and_records_new_card(self):

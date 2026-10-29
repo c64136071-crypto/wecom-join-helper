@@ -67,6 +67,17 @@ must satisfy both visual checks and contain the configured normalized keyword.
 The runner then uses a fail-closed one-attempt state machine for the document
 insertion and commit flow.
 
+When a long list hides the document action, the helper scrolls the document body
+within a bounded search. Button text must match **接龙** or **确定** exactly;
+toolbar controls such as **邀请填写** are excluded. Two consecutive frames must
+agree on the button position before clicking. An insertion is never retried.
+
+Default polling waits 0.5 seconds between scans at any time of day (recognition
+adds its own processing time). OCR initializes when monitoring starts. Document
+loading has a separate 20-second deadline; visible buttons are handled as soon
+as detected, without waiting out that deadline. Network speed and server-side
+ordering remain outside the helper's control.
+
 See [Architecture](docs/architecture.md) for the component and state diagrams.
 
 ## Limitations

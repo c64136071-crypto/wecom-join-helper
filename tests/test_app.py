@@ -5,6 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from wecom_rusher.config import Config
+from wecom_rusher.paths import AppPaths
+
 from wecom_rusher.app import (
     WeComRusherApp,
     application_root,
@@ -150,6 +153,23 @@ class AppTests(unittest.TestCase):
         live = Config(dry_run=False, setup_complete=True, recognition_test_passed=True)
         self.assertTrue(config_for_worker(live, test_mode=True).dry_run)
         self.assertFalse(config_for_worker(live, test_mode=False).dry_run)
+
+    def test_legacy_five_second_polling_is_migrated_without_losing_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths = AppPaths.resolve(Path(directory), portable=True)
+            paths.ensure()
+            Config(title_keyword="午茶", normal_interval_seconds=5.0).write_json(paths.config_path)
+            updated = load_application_config(paths)
+            self.assertEqual(updated.normal_interval_seconds, 0.5)
+            self.assertEqual(updated.title_keyword, "午茶")
+            self.assertEqual(Config.from_json(paths.config_path).normal_interval_seconds, 0.5)
+
+    def test_custom_polling_interval_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths = AppPaths.resolve(Path(directory), portable=True)
+            paths.ensure()
+            Config(normal_interval_seconds=2.0).write_json(paths.config_path)
+            self.assertEqual(load_application_config(paths).normal_interval_seconds, 2.0)
 
     def test_persist_application_config_does_not_store_runtime_paths(self):
         from wecom_rusher.config import Config

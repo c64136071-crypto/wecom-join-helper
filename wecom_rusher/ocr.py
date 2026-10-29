@@ -40,3 +40,7 @@ class OCRReader:
             return ""
         lines = [str(item[1]) for item in result if isinstance(item, (list, tuple)) and len(item) >= 2]
         return normalize_ocr_text("".join(lines))
+
+    def warmup(self) -> None:
+        """Initialize inference before a time-sensitive card arrives."""
+        self._get_engine()

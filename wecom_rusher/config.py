@@ -23,12 +23,13 @@ class Config:
     window_title_keyword: str = "企业微信|WeCom"
     document_window_title_keyword: str = "企业微信-文档"
     run_weekdays: tuple[int, ...] = ()
-    normal_interval_seconds: float = 5.0
+    normal_interval_seconds: float = 0.5
     rush_interval_seconds: float = 0.5
     rush_start: time = time(11, 0)
     rush_end: time = time(12, 0)
     match_threshold: float = 0.88
     action_timeout_seconds: float = 8.0
+    document_load_timeout_seconds: float = 20.0
     dry_run: bool = False
     setup_complete: bool = True
     recognition_test_passed: bool = True
@@ -123,6 +124,8 @@ class Config:
             raise ValueError("rush_interval_seconds must be positive")
         if self.action_timeout_seconds <= 0:
             raise ValueError("action_timeout_seconds must be positive")
+        if self.document_load_timeout_seconds <= 0:
+            raise ValueError("document_load_timeout_seconds must be positive")
         if not 0 < self.match_threshold <= 1:
             raise ValueError("match_threshold must be in (0, 1]")
         if self.rush_start >= self.rush_end:

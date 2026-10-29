@@ -9,6 +9,7 @@
   "rush_end": "12:00",
   "match_threshold": 0.88,
   "action_timeout_seconds": 8.0,
+  "document_load_timeout_seconds": 20.0,
   "dry_run": false,
   "setup_complete": true,
   "recognition_test_passed": true,

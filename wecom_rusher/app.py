@@ -94,6 +94,8 @@ def load_application_config(paths: AppPaths) -> Config:
     migrated = activate_live_mode(config)
     if migrated.title_keyword.strip() == "下午茶":
         migrated = replace(migrated, title_keyword="下午茶|午茶")
+    if migrated.normal_interval_seconds == 5.0 and migrated.rush_interval_seconds == 0.5:
+        migrated = replace(migrated, normal_interval_seconds=0.5)
     if migrated != config:
         migrated.write_json(paths.config_path)
     config = migrated

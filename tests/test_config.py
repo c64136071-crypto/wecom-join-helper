@@ -7,6 +7,10 @@ from wecom_rusher.config import Config
 
 
 class ConfigTests(unittest.TestCase):
+    def test_document_load_timeout_must_be_positive(self):
+        with self.assertRaisesRegex(ValueError, "document_load_timeout_seconds"):
+            Config(document_load_timeout_seconds=0).validate()
+
     def write_config(self, **overrides):
         values = {
             "normal_interval_seconds": 5.0,

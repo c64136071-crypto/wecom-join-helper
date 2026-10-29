@@ -6,6 +6,19 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-10-29
+
+### Fixed
+
+- Scroll long sign-up lists within a bounded document search when action
+  buttons are outside the viewport; allow up to 20 seconds for document loading.
+- Reject toolbar and unrelated button matches using exact OCR text and require
+  stable positions in two frames before clicking Join or Confirm.
+- Click the verified Confirm button once and require an observed edit state
+  before reporting success. Stop interrupts document search and confirmation.
+- Initialize OCR at Start and use 0.5-second default polling throughout the day;
+  migrate the previous 5-second/0.5-second desktop defaults.
+
 ## [1.0.9] - 2026-09-30
 
 ### Fixed

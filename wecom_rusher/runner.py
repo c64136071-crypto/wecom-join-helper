@@ -11,7 +11,7 @@ from .config import Config
 from .notify import Notifier
 from .schedule import PollSchedule
 from .state import SubmissionState
-from .ui import CardCandidate, MonitoringPaused, UIError, WeComUI
+from .ui import ActionStopped, CardCandidate, MonitoringPaused, UIError, WeComUI
 
 
 class UIAdapter(Protocol):
@@ -21,7 +21,7 @@ class UIAdapter(Protocol):
 
     def open_card(self, candidate: CardCandidate) -> None: ...
 
-    def submit_current_card(self) -> None: ...
+    def submit_current_card(self, stop_event: threading.Event | None = None) -> None: ...
 
     def card_is_submitted(self) -> bool: ...
 
@@ -83,10 +83,12 @@ class Rusher:
                 return "stopped"
             # From this point onward, conservatively assume an insertion may be sent.
             attempt_state = AttemptState.INSERTION_SENT
-            self.ui.submit_current_card()
+            self.ui.submit_current_card(stop_event=stop_event)
 
             deadline = time.monotonic() + self.config.action_timeout_seconds
             while time.monotonic() < deadline:
+                if stop_event is not None and stop_event.is_set():
+                    return "stopped"
                 if self.ui.card_is_submitted():
                     attempt_state = AttemptState.TERMINAL
                     self.state.record(candidate.fingerprint, "matched card")
@@ -97,6 +99,8 @@ class Rusher:
             attempt_state = AttemptState.TERMINAL
             self.notifier.notify("timeout", "未确认提交成功；不会重试")
             return "timeout"
+        except ActionStopped:
+            return "stopped"
         except MonitoringPaused as exc:
             self.logger.info("monitoring paused: %s", exc)
             return "paused"

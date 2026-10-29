@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,10 @@ class UIError(RuntimeError):
 
 class MonitoringPaused(UIError):
     """Raised when the helper is in front and must not steal focus."""
+
+
+class ActionStopped(UIError):
+    """Raised when an explicit stop interrupts a document action."""
 
 
 class TemplateStore:
@@ -93,12 +98,6 @@ def window_style_can_obscure(ex_style: int) -> bool:
     return not bool(ex_style & 0x20)  # WS_EX_TRANSPARENT
 
 
-def safe_commit_point(bounds: tuple[int, int, int, int]) -> tuple[int, int]:
-    """Return a point in the document's right-side blank area to commit focus."""
-    left, top, width, height = bounds
-    return width - 120, height // 2
-
-
 def match_has_filled_blue_background(
     screenshot: Any,
     match: TemplateMatch,
@@ -137,6 +136,9 @@ class WeComUI:
         self.ocr = OCRReader()
         self._group_signature: bytes | None = None
         self.assistant_window_handle = assistant_window_handle
+        self._button_text_cache: dict[str, str] = {}
+        self._edit_confirmed = False
+        self._commit_sent = False
 
     @staticmethod
     def _window_executable_name(window: Any) -> str:
@@ -251,6 +253,7 @@ class WeComUI:
         return self._select_window(windows, "Enterprise WeChat document")
 
     def prepare_monitoring(self) -> None:
+        self.ocr.warmup()
         window = self._main_window()
         try:
             if window.is_minimized():
@@ -483,51 +486,125 @@ class WeComUI:
             return
         time.sleep(0.25)
 
-    def _wait_for_template(self, template_name: str) -> tuple[int, int, tuple[int, int, int, int]]:
-        deadline = time.monotonic() + self.config.action_timeout_seconds
+    def _document_buttons(self, screenshot: Any, template_name: str) -> list[TemplateMatch]:
+        expected = {"join": "接龙", "submit": "确定"}[template_name]
+        accepted = []
+        for match in self._matches(screenshot, template_name):
+            # The persistent document toolbar contains an unrelated blue invite
+            # button which correlates strongly with the confirmation template.
+            if match.y < max(screenshot.height * 0.12, 120 * match.scale):
+                continue
+            if template_name == "submit" and not match_has_filled_blue_background(screenshot, match):
+                continue
+            crop = screenshot.crop((
+                max(0, match.x - match.width // 2 - 8),
+                max(0, match.y - match.height // 2 - 8),
+                min(screenshot.width, match.x + match.width // 2 + 8),
+                min(screenshot.height, match.y + match.height // 2 + 8),
+            ))
+            key = image_fingerprint(crop)
+            if key not in self._button_text_cache:
+                if len(self._button_text_cache) >= 64:
+                    self._button_text_cache.clear()
+                self._button_text_cache[key] = self.ocr.read(crop)
+            if self._button_text_cache[key] == expected:
+                accepted.append(match)
+        return accepted
+
+    @staticmethod
+    def _check_stopped(stop_event: threading.Event | None) -> None:
+        if stop_event is not None and stop_event.is_set():
+            raise ActionStopped("document action stopped by user")
+
+    def _guard_document(self, window: Any, stop_event: threading.Event | None) -> None:
+        self._check_stopped(stop_event)
+        if self._assistant_is_foreground() or window.is_minimized() or self._is_window_obscured(window):
+            raise UIError("document action interrupted by another window; no retry")
+
+    def _scroll_document(self, window: Any, bounds: tuple[int, int, int, int],
+                         stop_event: threading.Event | None) -> None:
+        self._guard_document(window, stop_event)
+        if self.config.dry_run:
+            return
+        import pyautogui
+
+        # Wheel input over the document body needs no click in an editable row.
+        pyautogui.moveTo(bounds[0] + bounds[2] // 2, bounds[1] + bounds[3] * 3 // 4)
+        self._guard_document(window, stop_event)
+        pyautogui.scroll(-10)
+
+    def _wait_for_template(
+        self, template_name: str, stop_event: threading.Event | None = None,
+    ) -> tuple[tuple[int, int], tuple[int, int, int, int], tuple[int, int]]:
+        timeout = (self.config.document_load_timeout_seconds if template_name == "join"
+                   else self.config.action_timeout_seconds)
+        started = time.monotonic()
+        deadline = started + timeout
+        next_scroll = started + 0.6
+        scrolls = 0
+        previous = None
         while time.monotonic() < deadline:
+            self._check_stopped(stop_event)
             try:
                 window = self._document_window()
             except UIError:
                 time.sleep(0.1)
                 continue
+            self._guard_document(window, stop_event)
             screenshot, bounds = self._screenshot(window, focus_window=False)
-            point = self._match(screenshot, template_name)
-            if point is not None:
-                return point, bounds, (screenshot.width, screenshot.height)
+            matches = self._document_buttons(screenshot, template_name)
+            if matches:
+                point = (matches[0].x, matches[0].y)
+                current = (point, bounds, self._window_handle(window))
+                # Require two fresh frames at the same location: concurrent
+                # sign-ups can move the button while OCR is running.
+                if current == previous and time.monotonic() < deadline:
+                    self._guard_document(window, stop_event)
+                    self.logger.debug("document %s ready; elapsed=%.2fs scrolls=%d",
+                                      template_name, time.monotonic() - started, scrolls)
+                    return point, bounds, screenshot.size
+                previous = current
+            else:
+                previous = None
+                if next_scroll <= time.monotonic() < deadline and scrolls < 24:
+                    self._scroll_document(window, bounds, stop_event)
+                    scrolls += 1
+                    next_scroll = time.monotonic() + 0.4
             time.sleep(0.1)
-        raise UIError(f"timed out waiting for template: {template_name}")
+        raise UIError(f"timed out waiting for document {template_name}; scrolls={scrolls}")
 
-    def submit_current_card(self) -> None:
+    def submit_current_card(self, stop_event: threading.Event | None = None) -> None:
+        self._edit_confirmed = False
+        self._commit_sent = False
         if self.config.dry_run:
             self.templates.load("join")
             self.templates.load("submit")
             self.logger.info("dry-run verified document action templates")
             return
-        join_point, bounds, _ = self._wait_for_template("join")
+        join_point, bounds, _ = self._wait_for_template("join", stop_event)
         self.logger.debug("document join button detected at %s", join_point)
+        self._check_stopped(stop_event)
         self._click(join_point, bounds)
-        edit_point, bounds, _ = self._wait_for_template("submit")
+        edit_point, bounds, _ = self._wait_for_template("submit", stop_event)
         self.logger.debug("document edit state detected at %s", edit_point)
-        commit_point = safe_commit_point(bounds)
-        self.logger.info("committing the prefilled name by clicking outside the list at %s", commit_point)
-        self._click(commit_point, bounds)
+        self._edit_confirmed = True
+        self._check_stopped(stop_event)
+        self._click(edit_point, bounds)
+        self._commit_sent = True
+        self.logger.info("confirmed the prefilled name once")
 
     def card_is_submitted(self) -> bool:
+        if not self._edit_confirmed or not self._commit_sent:
+            return False
         try:
             window = self._document_window()
+            self._guard_document(window, None)
             screenshot, _ = self._screenshot(window, focus_window=False)
-            join_matches = self._matches(screenshot, "join")
-            submit_candidates = self._matches(screenshot, "submit")
-            filled_submit_matches = [
-                match
-                for match in submit_candidates
-                if match_has_filled_blue_background(screenshot, match)
-            ]
+            join_matches = self._document_buttons(screenshot, "join")
+            filled_submit_matches = self._document_buttons(screenshot, "submit")
             self.logger.debug(
-                "submission verification; join=%d submit_candidates=%d filled_submit=%d",
+                "submission verification; join=%d verified_submit=%d",
                 len(join_matches),
-                len(submit_candidates),
                 len(filled_submit_matches),
             )
             return bool(join_matches) and not filled_submit_matches

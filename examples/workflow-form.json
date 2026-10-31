@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "runId": "fixture-form-v1",
+  "timeout_ms": 10000,
+  "steps": [
+    {"id":"locate-name","action":"locate","target":"name","value":null,"timeout_ms":2000},
+    {"id":"name","action":"input","target":"name","value":"Ada","timeout_ms":2000},
+    {"id":"quantity","action":"input","target":"quantity","value":2,"timeout_ms":2000},
+    {"id":"settle","action":"wait","target":null,"value":5,"timeout_ms":2000},
+    {"id":"save","action":"click","target":"save","value":null,"timeout_ms":2000},
+    {"id":"receipt","action":"read","target":"receipt","value":null,"timeout_ms":2000},
+    {"id":"verify","action":"assert","target":"receipt","value":1,"timeout_ms":2000}
+  ]
+}

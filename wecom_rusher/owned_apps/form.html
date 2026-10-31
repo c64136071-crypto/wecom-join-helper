@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Owned form — isolated test</title><link rel="icon" href="data:,">
+<style>body{font:18px system-ui;padding:32px;max-width:680px;background:#f1f5f9;color:#172033}label{display:block;margin:18px 0}input,button{font:inherit;padding:8px}output{display:block;margin-top:20px}</style></head>
+<body data-app-id="owned-dom-form" data-instance-id="{{INSTANCE}}">
+<h1>Owned inventory form</h1><p>New local application · no accounts · no existing windows</p>
+<form id="entry"><label>Name <input data-target="name" value="" maxlength="128"></label>
+<label>Quantity <input data-target="quantity" type="number" min="1" max="10000" value="1"></label>
+<button data-target="save" type="submit">Save inventory record</button></form>
+<output data-target="receipt">0</output>
+<script src="/app.js"></script></body></html>

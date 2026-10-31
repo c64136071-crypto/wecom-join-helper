@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "runId": "owned-report-example",
+  "timeout_ms": 60000,
+  "steps": [
+    {"id":"locate","action":"locate","target":"period","value":null,"timeout_ms":10000},
+    {"id":"period","action":"input","target":"period","value":"2026-10","timeout_ms":10000},
+    {"id":"export","action":"click","target":"export","value":null,"timeout_ms":10000},
+    {"id":"total","action":"read","target":"total","value":null,"timeout_ms":10000},
+    {"id":"verify-total","action":"assert","target":"total","value":20,"timeout_ms":10000},
+    {"id":"verify-receipt","action":"assert","target":"receipt","value":1,"timeout_ms":10000}
+  ]
+}

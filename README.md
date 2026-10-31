@@ -127,3 +127,15 @@ See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), and
 ## License
 
 [MIT](LICENSE)
+
+
+## Restricted workflow source extension
+
+The legacy visual helper and its v1.0.10 installer remain separate from the new
+source-only restricted workflow kernel. Start with the
+[source delivery guide](docs/recruitment-delivery.md): standard-library file
+fixtures, then explicitly configured two-owned-app DOM adapters. The accepted
+scope is real DOM save/CSV export in those two disposable apps, not Windows UIA,
+third-party RPA, production success rates or a new validated installer. Existing
+workflow documents retain their candidate-time wording; current scope and CI
+opt-in boundaries are explained in the delivery guide.

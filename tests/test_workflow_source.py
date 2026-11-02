@@ -19,7 +19,7 @@ class WorkflowSourceTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             source = root / 'input'
             for name in module.FILES:
                 path = source / name

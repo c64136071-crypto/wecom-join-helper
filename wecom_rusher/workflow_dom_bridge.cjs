@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {createOwnedServer} = require('./owned_apps/server.cjs');
+const {captureDiagnostic} = require('./workflow_dom_capture.cjs');
 const {spawn} = require('node:child_process');
 const root = path.resolve(process.argv[2]);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -129,7 +130,7 @@ async function openOwnedBrowser(config, origin, appPath) {
       await download.saveAs(file);
       if (fs.statSync(file).size > 65536 || await download.failure()) throw new Error('target_rejected');
       await guard(command.target);
-      await page.screenshot({path: path.join(config.artifacts, 'final.png'), timeout: 5000});
+      await captureDiagnostic(page, path.join(config.artifacts, 'final.png'), () => guard(command.target), event);
       return null;
     }
     if (command.action === 'click' && command.target === 'save') {
@@ -138,7 +139,7 @@ async function openOwnedBrowser(config, origin, appPath) {
       await locator.click({timeout: 5000});
       await page.waitForFunction(n => Number(document.querySelector('[data-target="receipt"]').textContent) === n, before + 1, {timeout: 5000});
       await guard(command.target);
-      await page.screenshot({path: path.join(config.artifacts, 'final.png'), timeout: 5000});
+      await captureDiagnostic(page, path.join(config.artifacts, 'final.png'), () => guard(command.target), event);
       return null;
     }
     if (command.action === 'input') {
@@ -151,7 +152,7 @@ async function openOwnedBrowser(config, origin, appPath) {
       await guard(command.target);
       const inputEvents = Number(await page.locator('body').getAttribute('data-input-events'));
       fs.appendFileSync(path.join(config.artifacts, 'dom-observations.jsonl'), JSON.stringify({action: 'input', target: command.target, inputEvents}) + '\n');
-      await page.screenshot({path: path.join(config.artifacts, 'final.png'), timeout: 5000});
+      await captureDiagnostic(page, path.join(config.artifacts, 'final.png'), () => guard(command.target), event);
       return null;
     }
     if (command.action === 'locate') return true;

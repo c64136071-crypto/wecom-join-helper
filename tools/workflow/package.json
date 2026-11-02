@@ -1,0 +1,9 @@
+{
+  "name": "join-helper-owned-workflow-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional project-local tooling for two self-owned DOM examples; no browser download",
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

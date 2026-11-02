@@ -131,6 +131,11 @@ See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), and
 
 ## Restricted workflow source extension
 
+For the runnable fixed-example launcher, dependency checks and scoped source ZIP,
+see [Workflow quick start / 受限流程启动](docs/workflow-start.md) and the
+[desktop maintenance plan](docs/desktop-maintenance.md). The original GUI remains
+unchanged; this delivery is not a new installer or portable EXE.
+
 The legacy visual helper and its v1.0.10 installer remain separate from the new
 source-only restricted workflow kernel. Start with the
 [source delivery guide](docs/recruitment-delivery.md): standard-library file
